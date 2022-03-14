@@ -1,5 +1,6 @@
 import { AmbientLight } from "three";
 
-export const MainAmbientLight = () => {
-  return { node: new AmbientLight(0x101010) };
+export const MainAmbientLight = {
+  node: AmbientLight,
+  params: [0x101010],
 };

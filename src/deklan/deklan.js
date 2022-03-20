@@ -1,5 +1,4 @@
 import { Clock, WebGLRenderer, Camera } from "three";
-import { Camera } from "./components/Camera.js";
 
 const updates = [];
 const buckets = {};
@@ -8,11 +7,41 @@ const refs = {};
 let currentCamera = null;
 let renderer = null;
 let currentScene = null;
+
+export const dFor = (count, component, changes) => {
+  let components = [];
+  if (component instanceof Array) {
+    components.push(...component);
+  } else {
+    for (let i = 0; i < count; i++) {
+      let alteredComponent = {};
+      for (let key in component) {
+        let componentValue = component[key];
+        if (typeof componentValue == "function") {
+          alteredComponent[key] = function (params = {}) {
+            componentValue.call(this, params);
+            if (changes[key]) {
+              changes[key].call(this, { ...params, index: i });
+            }
+          };
+        } else {
+          if (changes[key]) {
+            alteredComponent[key] = changes[key];
+          } else {
+            alteredComponent[key] = componentValue;
+          }
+        }
+      }
+      components.push(alteredComponent);
+    }
+  }
+  return components;
+};
 /**
  *
  * @param {{node:any, beforeAdd: Function, update: Function}} component
  */
-export const render = (component) => {
+export const renderTree = (component) => {
   let constructorParams = component.params || [];
   let node = new component.node(...constructorParams);
   if (node instanceof Camera) {
@@ -53,6 +82,9 @@ export const render = (component) => {
       }
     }
   }
+  if (component.afterAdd) {
+    component.afterAdd.call(node);
+  }
   return node;
 };
 
@@ -92,23 +124,25 @@ export const initialize = ({ scene }) => {
 };
 
 const clock = new Clock();
+const updateParams = {
+  scene: currentScene,
+  camera: currentCamera,
+  setCamera,
+  delta: null,
+  buckets,
+  namedComponents,
+  refs,
+};
+
 export const tick = () => {
   if (currentCamera == null || currentScene == null) {
     console.error("no camera or scene set");
     return;
   }
   requestAnimationFrame(() => {
-    let delta = clock.getDelta();
+    updateParams.delta = clock.getDelta();
     for (let update of updates) {
-      update({
-        scene: currentScene,
-        camera: currentCamera,
-        setCamera,
-        delta,
-        buckets,
-        namedComponents,
-        refs,
-      });
+      update(updateParams);
     }
     renderer.render(currentScene, currentCamera);
     tick();
